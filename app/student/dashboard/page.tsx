@@ -105,6 +105,112 @@ export default function StudentDashboard() {
         </Card>
       </div>
 
+      {/* Most Recent Application Tracker */}
+      {studentApplications.length > 0 && (
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Application Progress Tracker</CardTitle>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Live status for your most recent application: <span className="font-semibold text-foreground">{studentApplications[0].drive?.company?.name}</span> ({studentApplications[0].drive?.role})
+                </p>
+              </div>
+              <Badge className={statusColors[studentApplications[0].status]}>
+                {studentApplications[0].status.replace("-", " ")}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 pb-6">
+            <div className="relative flex flex-col md:flex-row items-center justify-between w-full mt-4 gap-6 md:gap-0">
+              {/* Horizontal line for desktop */}
+              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-border -translate-y-1/2 hidden md:block z-0" />
+              
+              {/* Steps */}
+              {(() => {
+                const currentApp = studentApplications[0];
+                const status = currentApp.status;
+                
+                // Define steps
+                const steps = [
+                  { key: "applied", label: "Applied", desc: `On ${currentApp.appliedAt}` },
+                  { key: "shortlisted", label: "Shortlisted", desc: "Resume review" },
+                  { key: "interview-scheduled", label: "Interviews", desc: "Technical & HR" },
+                  { key: "selected", label: "Result", desc: "Final outcome" }
+                ];
+
+                let activeIndex = 0;
+                let isRejected = status === "rejected";
+                let isWaitlisted = status === "waitlisted";
+                
+                if (status === "applied") activeIndex = 0;
+                else if (status === "shortlisted") activeIndex = 1;
+                else if (status === "interview-scheduled") activeIndex = 2;
+                else if (status === "selected" || status === "rejected" || status === "waitlisted") activeIndex = 3;
+
+                return steps.map((step, idx) => {
+                  const isCompleted = idx < activeIndex || (idx === 3 && status === "selected");
+                  const isCurrent = idx === activeIndex && !isCompleted;
+                  
+                  let stepIcon = <CheckCircle2 className="w-5 h-5" />;
+                  let borderClass = "border-muted-foreground/30 bg-background text-muted-foreground";
+                  let iconColorClass = "text-muted-foreground";
+                  let labelColorClass = "text-muted-foreground";
+
+                  if (isCompleted) {
+                    borderClass = "border-primary bg-primary text-primary-foreground scale-110 shadow-sm";
+                    iconColorClass = "text-primary-foreground";
+                    labelColorClass = "text-foreground font-semibold";
+                  } else if (isCurrent) {
+                    if (idx === 3 && isRejected) {
+                      borderClass = "border-destructive bg-destructive text-destructive-foreground scale-110";
+                      iconColorClass = "text-destructive-foreground";
+                      labelColorClass = "text-destructive font-semibold";
+                      stepIcon = <AlertCircle className="w-5 h-5" />;
+                    } else if (idx === 3 && isWaitlisted) {
+                      borderClass = "border-warning bg-warning text-warning-foreground scale-110";
+                      iconColorClass = "text-warning-foreground";
+                      labelColorClass = "text-warning-foreground font-semibold";
+                      stepIcon = <Clock className="w-5 h-5" />;
+                    } else {
+                      borderClass = "border-primary bg-background text-primary scale-110 ring-2 ring-primary/20";
+                      iconColorClass = "text-primary animate-pulse";
+                      labelColorClass = "text-primary font-semibold";
+                      stepIcon = <Clock className="w-5 h-5" />;
+                    }
+                  }
+
+                  let displayLabel = step.label;
+                  if (idx === 3) {
+                    if (isRejected) displayLabel = "Rejected";
+                    else if (isWaitlisted) displayLabel = "Waitlisted";
+                    else if (status === "selected") displayLabel = "Selected!";
+                  }
+
+                  return (
+                    <div key={step.key} className="relative z-10 flex flex-col items-center flex-1 w-full text-center">
+                      {/* Step Circle */}
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${borderClass}`}>
+                        <span className={iconColorClass}>{stepIcon}</span>
+                      </div>
+                      {/* Step labels */}
+                      <div className="mt-3">
+                        <p className={`text-sm font-medium transition-colors ${labelColorClass}`}>
+                          {displayLabel}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 max-w-[120px] mx-auto">
+                          {idx === activeIndex && idx === 3 ? (isRejected ? "Better luck next time" : isWaitlisted ? "On waitlist" : "Congratulations!") : step.desc}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Recent Applications */}
         <Card>

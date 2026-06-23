@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,93 @@ export default function StudentProfile() {
   });
   const [newSkill, setNewSkill] = useState("");
   const [newCertification, setNewCertification] = useState("");
+
+  // Resume Upload Dropzone State
+  const [resumes, setResumes] = useState([
+    { id: "1", name: "arjun-patel-resume-main.pdf", active: true, size: "1.2 MB", date: "2024-03-01" }
+  ]);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingName, setUploadingName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const handleFile = (file: File) => {
+    if (file.type !== "application/pdf") {
+      toast.error("Invalid file format. Please upload a PDF resume.");
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast.error("File is too large. Maximum size allowed is 5MB.");
+      return;
+    }
+
+    setUploadingName(file.name);
+    setUploadProgress(0);
+
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            const newResume = {
+              id: Date.now().toString(),
+              name: file.name,
+              active: resumes.length === 0,
+              size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+              date: new Date().toISOString().split("T")[0]
+            };
+            setResumes((prevResumes) => [...prevResumes, newResume]);
+            setUploadingName("");
+            setUploadProgress(0);
+            toast.success("Resume uploaded successfully!");
+          }, 300);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 150);
+  };
+
+  const deleteResume = (id: string) => {
+    const resumeToDelete = resumes.find(r => r.id === id);
+    setResumes(resumes.filter(r => r.id !== id));
+    toast.success(`Deleted ${resumeToDelete?.name}`);
+  };
+
+  const setActiveResume = (id: string) => {
+    setResumes(resumes.map(r => ({
+      ...r,
+      active: r.id === id
+    })));
+    toast.success("Active resume updated!");
+  };
 
   const addSkill = () => {
     if (newSkill && !profile.skills.includes(newSkill)) {
@@ -113,19 +201,78 @@ export default function StudentProfile() {
             </div>
             
             <div className="mt-6 pt-6 border-t border-border">
-              <p className="text-sm text-muted-foreground mb-3">Resume</p>
-              {currentStudent.resumeUrl ? (
-                <div className="flex items-center justify-center gap-2 text-sm">
-                  <FileText className="w-4 h-4 text-primary" />
-                  <span className="text-foreground">resume.pdf</span>
+              <p className="text-sm font-semibold text-foreground mb-3 text-left">Resumes ({resumes.length})</p>
+              
+              {/* List of resumes */}
+              {resumes.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  {resumes.map((res) => (
+                    <div key={res.id} className={`flex items-center gap-3 p-3 rounded-lg border text-left ${res.active ? "border-primary/50 bg-primary/5" : "border-border bg-secondary/30"}`}>
+                      <FileText className={`w-5 h-5 ${res.active ? "text-primary" : "text-muted-foreground"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{res.name}</p>
+                        <p className="text-xs text-muted-foreground">{res.size} • Uploaded {res.date}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {res.active ? (
+                          <Badge variant="default" className="text-[10px] py-0 px-1.5 bg-primary text-primary-foreground font-semibold">Active</Badge>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground" onClick={() => setActiveResume(res.id)}>
+                            Set Active
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => deleteResume(res.id)}>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No resume uploaded</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No resumes uploaded yet.</p>
               )}
-              <Button variant="outline" size="sm" className="mt-3 gap-2">
-                <Upload className="w-4 h-4" />
-                {currentStudent.resumeUrl ? "Update Resume" : "Upload Resume"}
-              </Button>
+
+              {/* Uploading progress */}
+              {uploadingName && (
+                <div className="p-3 rounded-lg border border-border bg-secondary/50 mb-4 text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-foreground truncate max-w-[80%]">{uploadingName}</span>
+                    <span className="text-xs text-primary font-semibold">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-primary h-1.5 transition-all duration-150" style={{ width: `${uploadProgress}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf"
+                onChange={handleFileChange}
+              />
+
+              {/* Dropzone */}
+              <div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                  dragActive 
+                    ? "border-primary bg-primary/5 scale-[1.02]" 
+                    : "border-muted-foreground/20 hover:border-primary/50 hover:bg-secondary/30"
+                }`}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <Upload className="w-8 h-8 text-muted-foreground animate-bounce" />
+                  <p className="text-sm font-semibold text-foreground">Drag & Drop your resume</p>
+                  <p className="text-xs text-muted-foreground">Supported format: PDF (Max 5MB)</p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -114,21 +115,49 @@ export default function AdminInterviews() {
       status: "scheduled",
       result: "pending",
     };
+    
+    // Update target student's application status
+    if (app) {
+      app.status = "interview-scheduled";
+    }
+
     setInterviews([newInterview, ...interviews]);
     setIsAddDialogOpen(false);
     resetForm();
+    toast.success(`Successfully scheduled ${formData.round} round for ${app?.student?.name}!`);
   };
 
   const updateResult = (id: string, result: Interview["result"]) => {
     setInterviews((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, result, status: "completed" as const } : i
-      )
+      prev.map((i) => {
+        if (i.id === id) {
+          const updated = { ...i, result, status: "completed" as const };
+          const app = mockApplications.find((a) => a.id === i.applicationId);
+          if (app) {
+            if (result === "passed") {
+              if (i.round === "hr" || i.roundNumber >= 2) {
+                app.status = "selected";
+                toast.success(`Result updated: Passed. Student ${app.student?.name} is SELECTED for ${app.drive?.company?.name}!`);
+              } else {
+                app.status = "shortlisted";
+                toast.success(`Result updated: Passed. Student ${app.student?.name} is shortlisted for the next round.`);
+              }
+            } else if (result === "failed") {
+              app.status = "rejected";
+              toast.error(`Result updated: Failed. Student ${app.student?.name} has been rejected.`);
+            }
+          }
+          return updated;
+        }
+        return i;
+      })
     );
   };
 
   const handleDelete = (id: string) => {
+    const interviewToDelete = interviews.find((i) => i.id === id);
     setInterviews(interviews.filter((i) => i.id !== id));
+    toast.success(`Deleted scheduled interview for ${interviewToDelete?.application?.student?.name}`);
   };
 
   const stats = {
